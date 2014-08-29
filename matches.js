@@ -216,10 +216,38 @@ function NthPC(pc, source) {
 		this.a = 2
 		this.b = 1
 	} else {
-		var m = /^(?:([+-]?\d+)?n)?([+-]?\d+)?$/.exec(source)
-		if (!m) throw new Error(source)
-		this.a = m[1] ? parseInt(m[1], 10) : 0
-		this.b = m[2] ? parseInt(m[2], 10) : 0
+		// read a integer
+		var m = /^([+-]?\d+)/.exec(source)
+		if (m) {
+			var i = m[1].length
+			if (source.length <= i) { // only `b`
+				this.a = 0
+				this.b = parseInt(m[1], 10)
+			} else {
+				var nextChar = source[i]
+				if (nextChar === 'n') { // `an+b`
+					this.a = parseInt(m[1], 10)
+					m = /^([+-]\d+)?$/.exec(source.slice(i + 1))
+					if (!m) throw new Error(source)
+					this.b = m[1] === undefined ? 0 : parseInt(m[1], 10)
+				} else { // `b+an`
+					this.b = parseInt(m[1], 10)
+					m = /^(?:([+-]\d*)n)?$/.exec(source.slice(i))
+					if (!m) throw new Error(source)
+					switch (m[1]) {
+						case undefined: this.a = 0; break
+						case '+': this.a = 1; break
+						case '-': this.a = -1; break
+						default: this.a = parseInt(m[1], 10)
+					}
+				}
+			}
+		} else { // not start with a integer
+			m = /^([+-]?)n([+-]\d+)?$/.exec(source)
+			if (!m) throw new Error(source)
+			this.a = m[1] === '-' ? -1 : 1
+			this.b = m[2] === undefined ? 0 : parseInt(m[2], 10)
+		}
 	}
 	this.last = /\blast-/.test(pc)
 	this.child = /-child$/.test(pc)
@@ -232,8 +260,28 @@ NthPC.prototype.constructor = NthPC
 NthPC.prototype.containsSelector = function (selector) {
 	if (this.last !== selector.last) return false
 	if (this.child === selector.child) {
-		return this.a > 0 && selector.a % this.a === 0 && selector.b === this.b ||
-			this.a <= 0 && selector.a <= 0 && selector.a === this.a && selector.b === this.b
+		//console.log(this, selector)
+		if (selector.a === 0) {
+			if (this.a === 0) return selector.b === this.b
+			var na = selector.b - this.b
+			return na === 0 ||
+				na % this.a === 0 && /* n >= 0 */
+				(na > 0 && this.a > 0 || na < 0 && this.a < 0)
+		}
+		if (selector.a > 0) {
+			if (this.a <= 0 || selector.a % this.a !== 0) return false
+			var na = selector.b - this.b
+			//console.log(na % selector.a, na, selector.a)
+			return na % this.a === 0
+		}
+		var a = []
+		for (var e = selector.b; e > 0; e += selector.a) a.push(e)
+		return a.every(function (e) {
+			var na = e - this.b
+			return na === 0 ||
+				na % this.a === 0 && /* n >= 0 */
+				(na > 0 && this.a > 0 || na < 0 && this.a < 0)
+		}.bind(this))
 	}
 	return selector.child && this.a === 0 && this.b === 1 && selector.a === 0 && selector.b === 1
 }
@@ -389,7 +437,6 @@ assert(
 assert(
 	!Selector('div#1 span:first-child').contains('div#1>a:first-of-type>span:nth-of-type(3)')
 )
-return
 
 assert(
 	Selector('div#1 span:nth-of-type(n)').contains('div#1>a:first-of-type>span:nth-of-type(3)')
@@ -398,16 +445,21 @@ assert(
 assert(
 	Selector(':nth-child(n)').contains(':nth-child(3n-1)')
 )
+/*
 assert(
-	Selector(':nth-child(n)').contains(':nth-child(-3n-1)')
+	Selector(':nth-child(n)').contains(':nth-child(-3n+1)')
+)
+*/
+assert(
+	!Selector(':nth-child(6-n)').contains(':nth-child(n)')
 )
 assert(
-	Selector(':nth-child(6-n)').contains(':nth-child(n)')
+	Selector(':nth-child(n)').contains(':nth-child(8-n)')
 )
 assert(
-	Selector(':nth-child(6-n)').contains(':nth-child(8-n)')
+	Selector(':nth-child(8-n)').contains(':nth-child(8-2n)')
 )
 assert(
-	!Selector(':nth-child(6-n)').contains(':nth-child(5-n)')
+	Selector(':nth-child(6-n)').contains(':nth-child(6-n)')
 )
 
