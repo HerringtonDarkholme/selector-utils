@@ -1,6 +1,15 @@
 var assert = require('assert')
 var Selector = require('../Selector').Selector
 
+
+assert.equal(Selector.normalize('test'), 'test')
+assert.equal(Selector.normalize('test/*comments*/'), 'test')
+assert.equal(Selector.normalize('test\\ ok'), 'test\\20ok')
+assert.equal(Selector.normalize('test\\+ok'), 'test\\2bok')
+assert.equal(Selector.normalize('test\\20 ok'), 'test\\20ok')
+assert.equal(Selector.normalize('test\\20 1'), 'test\\0000201')
+assert.equal(Selector.normalize('\\t\\e\\s\\t\\020  ok'), '\\t\\e\\s\\t\\020  ok')
+
 assert(
 	Selector('a').contains('a')
 )
@@ -158,3 +167,5 @@ assert(
 	Selector('div a:first-of-type').contains('div>span#1+a:first-of-type')
 )
 */
+
+console.log('All tests passed.')

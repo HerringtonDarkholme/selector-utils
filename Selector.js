@@ -7,16 +7,18 @@ function Selector(source) {
 	return s.list.length === 1 ? s.list[0] : s
 }
 Selector.normalize = function (selector) {
-	return selector.replace(/(\/\*.*?\*\/)|\\(?:([0-9a-fA-F]{1,6}\s)|([\/,\s>+~#.:\[])|(.))/g,
-		function (m, comment, specialChar, hexDigits, index) {
+	return selector.replace(/(\/\*.*?\*\/)|\\(?:([0-9a-fA-F]{1,6}\s)|([\/,\s>+~#.:\[])|.)/g,
+		function (m, comment, hexDigits, specialChar, index) {
 			if (comment) return ''
-			var hex = specialChar ?
-				specialChar.charCodeAt(0).toString(16) :
-				hexDigits.slice(0, -1)
+			var hex
+			if (hexDigits) hex = hexDigits.slice(0, -1)
+			else if (specialChar) hex = specialChar.charCodeAt(0).toString(16)
+			else return m
+				
 			var nextChar = selector[index + m.length]
-			if (/[0-9a-fA-F]/.test(nextChar)) return ('00000' + hex).slice(-6)
-			if (/\s/.test(nextChar)) return hex + ' '
-			return hex
+			if (/[0-9a-fA-F]/.test(nextChar)) return '\\' + ('00000' + hex).slice(-6)
+			if (/\s/.test(nextChar)) return '\\' + hex + ' '
+			return '\\' + hex
 		})
 }
 
