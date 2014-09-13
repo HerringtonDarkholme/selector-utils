@@ -4,7 +4,8 @@ function trim(s) {
 
 function Selector(source) {
 	var s = new SelectorList(Selector.normalize(source))
-	return s.list.length === 1 ? s.list[0] : s
+	// return s.list.length === 1 ? s.list[0] : s
+  return s
 }
 Selector.normalize = function (selector) {
 	return selector.replace(/(\/\*.*?\*\/)|\\(?:([0-9a-fA-F]{1,6}\s)|([\/,\s>+~#.:\[])|.)/g,
@@ -14,7 +15,7 @@ Selector.normalize = function (selector) {
 			if (hexDigits) hex = hexDigits.slice(0, -1)
 			else if (specialChar) hex = specialChar.charCodeAt(0).toString(16)
 			else return m
-				
+
 			var nextChar = selector[index + m.length]
 			if (/[0-9a-fA-F]/.test(nextChar)) return '\\' + ('00000' + hex).slice(-6)
 			if (/\s/.test(nextChar)) return '\\' + hex + ' '
@@ -48,17 +49,19 @@ SelectorList.prototype.toString = function () {
 	return this.list.join(', ')
 }
 SelectorList.prototype.containsSelector = function (selector) {
-	return this.list.some(function (s) { return s.contains(selector) })
+	return selector.list.every((function (sp) {
+      return this.list.some(function (s) { return s.contains(sp) })
+  }).bind(this))
 }
 
 function ComplexSelector(source) {
 	if (Array.isArray(source)) {
-		if (source.length === 0) throw new Error()
+		if (!source.length%2) throw new Error()
 		AbstractSelector.call(this, source.join(''))
 	} else {
 		if (source.search(/,/) >= 0) throw new Error()
-		AbstractSelector.call(this, source)	
-		source = trim(source).split(/\s*([>+~])\s*|\s+/)
+		AbstractSelector.call(this, source)
+		source = trim(source).split(/\s*(>|~(?!=)|\+(?!\d|n\)))\s*|\s+/)
 	}
 	this.x = new CompoundSelector(source.pop())
 	this.combinator = source.length > 0 ? source.pop() || ' ' : null
@@ -74,7 +77,8 @@ ComplexSelector.prototype.containsSelector = function (selector) {
 	if (!r) return r
 	if (!this.combinator) return r
 	if (this.combinator !== selector.combinator) {
-		if (this.combinator === ' ' && selector.combinator === '>') {
+		if (this.combinator === ' ' ) {
+
 			var xs = selector.xs
 			while (true) {
 				if (!xs) return null
@@ -86,16 +90,32 @@ ComplexSelector.prototype.containsSelector = function (selector) {
 					if (!c) return null
 					xs = xs.xs
 					if (!xs) return null
-				} while (!(c === ' ' || c === '>'))					
+				} while (!(c === ' ' || c === '>'))
 			}
 		}
-		return null	
-	} 
+    if (this.combinator === '~') {
+			var xs = selector.xs
+			while (true) {
+				if (!xs) return null
+				r = this.xs.contains(xs)
+				if (r) return r
+				var c
+				do {
+					c = xs.combinator
+					if (!c) return null
+					xs = xs.xs
+					if (!xs) return null
+				} while (!(c === '+' || c === '~'))
+			}
+
+    }
+		return null
+	}
 	return !this.xs || this.xs.contains(selector.xs)
 }
 
 function CompoundSelector(source) {
-	if (source.search(/[, >+~]/) >= 0) throw new Error()
+	if (source.search(/[, >]|~(?!=)|\+(?!\d|n\))/) >= 0) throw new Error()
 	AbstractSelector.call(this, source)
 	var a = source.split(/([#.:\[])/)
 	this.type = new ElementalSelector(a[0])
@@ -183,14 +203,14 @@ AttributeSelector.prototype.containsSelector = function (selector) {
 				selector.rel === '^=' && selector.val.slice(0, this.val.length + 1) === this.val + '-'
 		case '^=':
 			return this.val &&
-				(selector.rel === '=' || selector.rel === '|=' || selector.rel === '^=') && 
+				(selector.rel === '=' || selector.rel === '|=' || selector.rel === '^=') &&
 				selector.val.slice(0, this.val.length) === this.val
 		case '$=':
-			return this.val && 
-				(selector.rel === '=' || selector.rel === '$=') && 
+			return this.val &&
+				(selector.rel === '=' || selector.rel === '$=') &&
 				selector.val.slice(-this.val.length) === this.val
 		case '*=':
-			return this.val && selector.val.indexOf(this.val) >= 0
+			return this.val && selector.val && selector.val.indexOf(this.val) >= 0
 		default: return false
 	}
 }
@@ -274,18 +294,26 @@ NthPC.prototype.containsSelector = function (selector) {
 			if (this.a <= 0 || selector.a % this.a !== 0) return false
 			var na = selector.b - this.b
 			//console.log(na % selector.a, na, selector.a)
-			return na % this.a === 0
+      var sa = selector.a
+      var sb = selector.b
+      var a = this.a
+      var b = this.b
+			return na % this.a === 0 && _firstNaturalNum(sa, sb) >= _firstNaturalNum(a, b)
 		}
 		var a = []
 		for (var e = selector.b; e > 0; e += selector.a) a.push(e)
 		return a.every(function (e) {
 			var na = e - this.b
 			return na === 0 ||
-				na % this.a === 0 && /* n >= 0 */
+				na % this.a === 0 && /* if this.a is zero, then NaN will fail here*/
 				(na > 0 && this.a > 0 || na < 0 && this.a < 0)
 		}.bind(this))
 	}
 	return selector.child && this.a === 0 && this.b === 1 && selector.a === 0 && selector.b === 1
+}
+
+function _firstNaturalNum(a, b) {
+  return b > 0 ? b : (b % a + a);
 }
 
 function NthChildPC(source) { NthPC.call(this, 'nth-child', source) }
@@ -310,6 +338,8 @@ function PsuedoClass(source) {
 }
 PsuedoClass['nth-child'] = NthChildPC
 PsuedoClass['nth-of-type'] = NthOfTypePC
+PsuedoClass['nth-last-child'] = NthLastChildPC
+PsuedoClass['nth-last-of-type'] = NthLastOfTypePC
 PsuedoClass['first-child'] = new NthPC('first-child')
 PsuedoClass['first-of-type'] = new NthPC('first-of-type')
 PsuedoClass['last-child'] = new NthPC('last-child')
