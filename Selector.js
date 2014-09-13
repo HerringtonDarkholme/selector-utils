@@ -346,3 +346,4 @@ PsuedoClass['last-child'] = new NthPC('last-child')
 PsuedoClass['last-of-type'] = new NthPC('last-of-type')
 
 if (typeof exports === 'object') exports.Selector = Selector
+exports.ComplexSelector = ComplexSelector
