@@ -1,7 +1,5 @@
 var assert = require('assert')
 var Selector = require('../Selector').Selector
-var ComplexSelector = require('../Selector').ComplexSelector
-
 
 // assert.equal(Selector.normalize('test'), 'test')
 // assert.equal(Selector.normalize('test/*comments*/'), 'test')
@@ -16,8 +14,7 @@ function main() {
     var i = TIMES
     var then = Date.now()
     while (i > 0) {
-      // test()
-      new ComplexSelector('body div a span')
+      test()
       i -= 1
     }
     var now = Date.now()
@@ -27,8 +24,7 @@ function main() {
     i = TIMES
     then = Date.now()
     while (i > 0) {
-      // test()
-      new ComplexSelector('body div a span')
+      test()
       i -= 1
     }
     now = Date.now()
@@ -158,11 +154,11 @@ assert(
 assert(
 	Selector(':nth-child(n)').contains(':nth-child(3n-1)')
 )
-/*
+
 assert(
 	Selector(':nth-child(n)').contains(':nth-child(-3n+1)')
 )
-*/
+
 assert(
 	!Selector(':nth-child(6-n)').contains(':nth-child(n)')
 )
